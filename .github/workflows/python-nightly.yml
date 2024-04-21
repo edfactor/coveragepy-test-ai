@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   tests:
-    name: "${{ matrix.python-version }} on ${{ matrix.os-short }}"
+    name: "${{ matrix.python-version }}${{ matrix.nogil && ' nogil' || '' }} on ${{ matrix.os-short }}"
     runs-on: "${{ matrix.os }}"
     # If it doesn't finish in an hour, it's not going to. Don't spin for six
     # hours needlessly.
@@ -63,9 +63,15 @@ jobs:
           - "pypy-3.9-nightly"
           - "pypy-3.10-nightly"
         include:
-            - python-version: "pypy-3.10-nightly"
-              os: "windows-latest"
-              os-short: "windows"
+          - python-version: "pypy-3.10-nightly"
+            os: "windows-latest"
+            os-short: "windows"
+          - python-version: "3.13-dev"
+            # nogil fails for now. hugovk says it's because:
+            # > pip hasn't vendored the new version of packaging yet.
+            # > it should be in 24.1, due some time this month.
+            nogil: true
+
       fail-fast: false
 
     steps:
@@ -77,6 +83,7 @@ jobs:
         if: "!startsWith(matrix.python-version, 'pypy-')"
         with:
           python-version: "${{ matrix.python-version }}"
+          nogil: "${{ matrix.nogil || false }}"
 
       - name: "Install ${{ matrix.python-version }} with setup-python"
         uses: "actions/setup-python@v5"
