@@ -29,7 +29,7 @@ LINTABLE = coverage setup.py test
 lint:
 	-pylint --rcfile=.pylintrc $(LINTABLE)
 	python -m tabnanny $(LINTABLE)
-	python checkeol.py
+	python igor.py check_eol
 
 pep8:
 	pep8 --filename=*.py --ignore=E401,E301 --repeat coverage
@@ -52,10 +52,14 @@ covcov: testready
 
 # Kitting
 
-kit:
-	python setup.py sdist --keep-temp --formats=gztar fixtar --owner=ned --group=coverage --clean
-	python setup.py bdist_wininst
+SDIST_CMD = python setup.py sdist --keep-temp --formats=gztar fixtar --owner=ned --group=coverage --clean
 
+kit:
+	$(SDIST_CMD)
+
+kit_upload:
+	$(SDIST_CMD) upload
+	
 pypi:
 	python setup.py register
 

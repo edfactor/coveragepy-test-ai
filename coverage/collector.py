@@ -1,12 +1,23 @@
 """Raw data collector for Coverage."""
 
-import sys, threading
+import os, sys, threading
 
 try:
     # Use the C extension code when we can, for speed.
     from coverage.tracer import CTracer
 except ImportError:
     # Couldn't import the C extension, maybe it isn't built.
+    if os.getenv('COVERAGE_TEST_TRACER') == 'c':
+        # During testing, we use the COVERAGE_TEST_TRACER env var to indicate
+        # that we've fiddled with the environment to test this fallback code.
+        # If we thought we had a C tracer, but couldn't import it, then exit
+        # quickly and clearly instead of dribbling confusing errors. I'm using
+        # sys.exit here instead of an exception because an exception here
+        # causes all sorts of other noise in unittest.
+        sys.stderr.write(
+            "*** COVERAGE_TEST_TRACER is 'c' but can't import CTracer!\n"
+            )
+        sys.exit(1)
     CTracer = None
 
 
@@ -45,7 +56,8 @@ class PyTracer(object):
         """The trace function passed to sys.settrace."""
 
         #print("trace event: %s %r @%d" % (
-        #           event, frame.f_code.co_filename, frame.f_lineno))
+        #           event, frame.f_code.co_filename, frame.f_lineno),
+        #      file=sys.stderr)
 
         if self.last_exc_back:
             if frame == self.last_exc_back:
@@ -232,10 +244,10 @@ class Collector(object):
         if self._collectors:
             self._collectors[-1].pause()
         self._collectors.append(self)
-        #print >>sys.stderr, "Started: %r" % self._collectors
+        #print("Started: %r" % self._collectors, file=sys.stderr)
 
         # Check to see whether we had a fullcoverage tracer installed.
-        traces0 = None
+        traces0 = []
         if hasattr(sys, "gettrace"):
             fn0 = sys.gettrace()
             if fn0:
@@ -246,10 +258,14 @@ class Collector(object):
         # Install the tracer on this thread.
         fn = self._start_tracer()
 
-        if traces0:
-            for args in traces0:
-                (frame, event, arg), lineno = args
+        for args in traces0:
+            (frame, event, arg), lineno = args
+            try:
                 fn(frame, event, arg, lineno=lineno)
+            except TypeError:
+                raise Exception(
+                    "fullcoverage must be run with the C trace function."
+                )
 
         # Install our installation tracer in threading, to jump start other
         # threads.

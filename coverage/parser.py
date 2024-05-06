@@ -35,6 +35,10 @@ class CodeParser(object):
                     "No source for code: %r: %s" % (self.filename, err)
                     )
 
+        # Scrap the BOM if it exists.
+        if self.text and ord(self.text[0]) == 0xfeff:
+            self.text = self.text[1:]
+
         self.exclude = exclude
 
         self.show_tokens = False
@@ -199,7 +203,15 @@ class CodeParser(object):
         statements.
 
         """
-        self._raw_parse()
+        try:
+            self._raw_parse()
+        except tokenize.TokenError:
+            _, tokerr, _ = sys.exc_info()
+            msg, lineno = tokerr.args
+            raise NotPython(
+                "Couldn't parse '%s' as Python source: '%s' at %s" %
+                    (self.filename, msg, lineno)
+                )
 
         excluded_lines = self.first_lines(self.excluded)
         ignore = excluded_lines + list(self.docstrings)

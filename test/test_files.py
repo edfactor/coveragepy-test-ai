@@ -37,6 +37,17 @@ class FileLocatorTest(CoverageTest):
         self.assertEqual(fl.relative_filename(a1), "file1.py")
         self.assertEqual(fl.relative_filename(a2), a2)
 
+    def test_filepath_contains_absolute_prefix_twice(self):
+        # https://bitbucket.org/ned/coveragepy/issue/194/filelocatorrelative_filename-could-mangle
+        # Build a path that has two pieces matching the absolute path prefix.
+        # Technically, this test doesn't do that on Windows, but drive
+        # letters make that impractical to acheive.
+        fl = FileLocator()
+        d = fl.abs_file(os.curdir)
+        trick = os.path.splitdrive(d)[1].lstrip(os.path.sep)
+        rel = os.path.join('sub', trick, 'file1.py')
+        self.assertEqual(fl.relative_filename(fl.abs_file(rel)), rel)
+
 
 class MatcherTest(CoverageTest):
     """Tests of file matchers."""
@@ -147,7 +158,6 @@ class FindPythonFilesTest(CoverageTest):
     def test_find_python_files(self):
         self.make_file("sub/a.py")
         self.make_file("sub/b.py")
-        self.make_file("sub/__init__.py")
         self.make_file("sub/x.c")                   # nope: not .py
         self.make_file("sub/ssub/__init__.py")
         self.make_file("sub/ssub/s.py")
@@ -155,7 +165,7 @@ class FindPythonFilesTest(CoverageTest):
         self.make_file("sub/lab/exp.py")            # nope: no __init__.py
         py_files = set(find_python_files("sub"))
         self.assert_same_files(py_files, [
-            "sub/__init__.py", "sub/a.py", "sub/b.py",
+            "sub/a.py", "sub/b.py",
             "sub/ssub/__init__.py", "sub/ssub/s.py",
             ])
 
