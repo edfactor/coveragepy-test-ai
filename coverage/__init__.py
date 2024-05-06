@@ -1,15 +1,18 @@
 """Code coverage measurement for Python.
 
 Ned Batchelder
-http://nedbatchelder.com/code/modules/coverage.html
+http://nedbatchelder.com/code/coverage
 
 """
 
-__version__ = "3.0b1"    # see detailed history in CHANGES
+__version__ = "3.5.1"     # see detailed history in CHANGES.txt
 
-import sys
+__url__ = "http://nedbatchelder.com/code/coverage"
+if max(__version__).isalpha():
+    # For pre-releases, use a version-specific URL.
+    __url__ += "/" + __version__
 
-from coverage.control import coverage
+from coverage.control import coverage, process_startup
 from coverage.data import CoverageData
 from coverage.cmdline import main, CoverageScript
 from coverage.misc import CoverageException
@@ -17,38 +20,47 @@ from coverage.misc import CoverageException
 
 # Module-level functions.  The original API to this module was based on
 # functions defined directly in the module, with a singleton of the coverage()
-# class.  This design hampered programmability.  Here we define the top-level
-# functions to create the singleton when they are first called.
+# class.  That design hampered programmability, so the current api uses
+# explicitly-created coverage objects.  But for backward compatibility, here we
+# define the top-level functions to create the singleton when they are first
+# called.
 
 # Singleton object for use with module-level functions.  The singleton is
 # created as needed when one of the module-level functions is called.
-the_coverage = None
+_the_coverage = None
 
-def call_singleton_method(name, args, kwargs):
-    global the_coverage
-    if not the_coverage:
-        the_coverage = coverage()
-    return getattr(the_coverage, name)(*args, **kwargs)
+def _singleton_method(name):
+    """Return a function to the `name` method on a singleton `coverage` object.
 
-mod_funcs = """
-    use_cache start stop erase begin_recursive end_recursive exclude
-    analysis analysis2 report annotate annotate_file
+    The singleton object is created the first time one of these functions is
+    called.
+
     """
+    def wrapper(*args, **kwargs):
+        """Singleton wrapper around a coverage method."""
+        global _the_coverage
+        if not _the_coverage:
+            _the_coverage = coverage(auto_data=True)
+        return getattr(_the_coverage, name)(*args, **kwargs)
+    return wrapper
 
-coverage_module = sys.modules[__name__]
 
-for func_name in mod_funcs.split():
-    # Have to define a function here to make a closure so the function name
-    # is locked in.
-    def func(name):
-        return lambda *a, **kw: call_singleton_method(name, a, kw)
-    setattr(coverage_module, func_name, func(func_name))
+# Define the module-level functions.
+use_cache = _singleton_method('use_cache')
+start =     _singleton_method('start')
+stop =      _singleton_method('stop')
+erase =     _singleton_method('erase')
+exclude =   _singleton_method('exclude')
+analysis =  _singleton_method('analysis')
+analysis2 = _singleton_method('analysis2')
+report =    _singleton_method('report')
+annotate =  _singleton_method('annotate')
 
 
 # COPYRIGHT AND LICENSE
 #
 # Copyright 2001 Gareth Rees.  All rights reserved.
-# Copyright 2004-2009 Ned Batchelder.  All rights reserved.
+# Copyright 2004-2010 Ned Batchelder.  All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are

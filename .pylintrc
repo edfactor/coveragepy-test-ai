@@ -53,17 +53,29 @@ load-plugins=
 #enable-msg=
 
 # Disable the message(s) with the given id(s).
+disable= 
 # Messages that are just silly:
 #   I0011:106: Locally disabling E1101
-#   W0603: 28:call_singleton_method: Using the global statement
+#   W0122: 30:run_python_file: Use of the exec statement
 #   W0142: 31:call_singleton_method: Used * or ** magic
+#   W0232:  6:AnyOldObject: Class has no __init__ method
 #   C0323:311:coverage.report: Operator not followed by a space
+#   C0324: 15: Comma not followed by a space
+#   W0603: 28:call_singleton_method: Using the global statement
+#   W0703:133:CoverageData._read_file: Catch "Exception"
+    I0011,W0122,W0142,W0232,C0323,C0324,W0603,W0703,
 # Messages that may be silly:
 #   R0201: 42:Tracer.stop: Method could be a function
+#   C0321: 80:CodeUnit.__lt__: More than one statement on a single line    
+#   R0401:  1: Cyclic import (coverage -> coverage.control -> coverage.html)
+#   W0403:  4: Relative import 'coveragetest'
+#   E1103: 26:RunTests.test_run_python_file: Instance of 'file' has no 'getvalue' member (but some types could not be inferred)
+    R0201,C0321,R0401,W0403,E1103,
 # Messages that are noisy for now, eventually maybe we'll turn them on:
-#   C0111:169:coverage.analyze_morf: Missing docstring
 #   C0103:256:coverage.morf_filename: Invalid name "f" (should match [a-z_][a-z0-9_]{2,30}$)
-disable-msg=I0011,W0603,W0142,C0323, R0201, C0111,C0103
+#   W0212: 86:Reporter.report_files: Access to a protected member _analyze of a client class     
+#   W0404: 22:run_tests_with_coverage: Reimport 'coverage' (imported line 18)
+    C0103,W0212,W0404
 
 [REPORTS]
 
@@ -117,7 +129,7 @@ required-attributes=
 
 # Regular expression which should only match functions or classes name which do
 # not require a docstring
-no-docstring-rgx=__.*__
+no-docstring-rgx=__.*__|test[A-Z_].*|setUp|tearDown
 
 # Regular expression which should only match correct module names
 module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
@@ -212,7 +224,7 @@ additional-builtins=
 ignore-iface-methods=isImplementedBy,deferred,extends,names,namesAndDescriptions,queryDescriptionFor,getBases,getDescriptionFor,getDoc,getName,getTaggedValue,getTaggedValueTags,isEqualOrExtendedBy,setTaggedValue,isImplementedByInstancesOf,adaptWith,is_implemented_by
 
 # List of method names used to declare (i.e. assign) instance attributes.
-defining-attr-methods=__init__,__new__,setUp
+defining-attr-methods=__init__,__new__,setUp,reset
 
 
 # checks for sign of poor/misdesign:
@@ -243,7 +255,7 @@ max-parents=7
 max-attributes=40
 
 # Minimum number of public methods for a class (see R0903).
-min-public-methods=1
+min-public-methods=0
 
 # Maximum number of public methods for a class (see R0904).
 max-public-methods=500
@@ -282,10 +294,10 @@ int-import-graph=
 [FORMAT]
 
 # Maximum number of characters on a single line.
-max-line-length=80
+max-line-length=79
 
 # Maximum number of lines in a module
-max-module-lines=1000
+max-module-lines=10000
 
 # String used as indentation unit. This is usually " " (4 spaces) or "\t" (1
 # tab).
