@@ -1,11 +1,9 @@
 """Run tests in the farm subdirectory.  Designed for nose."""
 
-import filecmp, fnmatch, glob, os, shutil, sys
+import difflib, filecmp, fnmatch, glob, os, re, shutil, sys
 
-try:
-    import subprocess
-except ImportError:
-    subprocess = None
+sys.path.insert(0, os.path.split(__file__)[0]) # Force relative import for Py3k
+from backtest import run_command, execfile # pylint: disable-msg=W0622
 
 
 def test_farm(clean_only=False):
@@ -50,6 +48,16 @@ class FarmTestCase(object):
         cwd = os.getcwd()
         os.chdir(newdir)
         return cwd
+
+    def addtopath(self, directory):
+        """Add `directory` to the path, and return the old path."""
+        oldpath = sys.path[:]
+        sys.path.insert(0, directory)
+        return oldpath
+    
+    def restorepath(self, path):
+        """Restore the system path to `path`."""
+        sys.path = path
 
     def __call__(self):
         """Execute the test from the run.py file.
@@ -133,19 +141,11 @@ class FarmTestCase(object):
         cwd = self.cd(rundir)
         try:
             for cmd in cmds.split("\n"):
-                if not cmd.strip():
+                cmd = cmd.strip()
+                if not cmd:
                     continue
-                if subprocess:
-                    proc = subprocess.Popen(cmd, shell=True, 
-                              stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT)
-                    retcode = proc.wait()
-                    output = proc.stdout.read()
-                else:
-                    _, stdouterr = os.popen4(cmd)
-                    output = stdouterr.read()
-                    retcode = 0 # Can't tell if the process failed.
-                print output,
+                retcode, output = run_command(cmd)
+                print(output.rstrip())
                 if outfile:
                     open(outfile, "a+").write(output)
                 if retcode:
@@ -153,7 +153,7 @@ class FarmTestCase(object):
         finally:
             self.cd(cwd)
 
-    def runfunc(self, fn, rundir="src"):
+    def runfunc(self, fn, rundir="src", addtopath=None):
         """Run a function.
         
         `fn` is a callable.
@@ -162,13 +162,15 @@ class FarmTestCase(object):
         """
         
         cwd = self.cd(rundir)
+        oldpath = self.addtopath(addtopath)
         try:
             fn()
         finally:
             self.cd(cwd)
+            self.restorepath(oldpath)
 
     def compare(self, dir1, dir2, filepattern=None, size_within=0,
-            left_extra=False, right_extra=False
+            left_extra=False, right_extra=False, scrubs=None
             ):
         """Compare files matching `filepattern` in `dir1` and `dir2`.
         
@@ -186,6 +188,9 @@ class FarmTestCase(object):
         `left_extra` true means the left directory can have extra files in it
         without triggering an assertion.  `right_extra` means the right
         directory can.
+        
+        `scrubs` is a list of pairs, regex find and replace patterns to use to
+        scrub the files of unimportant differences.
         
         An assertion will be raised if the directories fail one of their
         matches.
@@ -228,16 +233,34 @@ class FarmTestCase(object):
             # ourselves.
             text_diff = []
             for f in diff_files:
-                left = open(os.path.join(dir1, f), "r").read()
-                right = open(os.path.join(dir2, f), "r").read()
+                left = open(os.path.join(dir1, f), "rU").readlines()
+                right = open(os.path.join(dir2, f), "rU").readlines()
+                if scrubs:
+                    left = self._scrub(left, scrubs)
+                    right = self._scrub(right, scrubs)
                 if left != right:
                     text_diff.append(f)
+                    print("".join(list(difflib.Differ().compare(left, right))))
             assert not text_diff, "Files differ: %s" % text_diff
 
         if not left_extra:
             assert not left_only, "Files in %s only: %s" % (dir1, left_only)
         if not right_extra:
             assert not right_only, "Files in %s only: %s" % (dir2, right_only)
+
+    def _scrub(self, strlist, scrubs):
+        """Scrub uninteresting data from the strings in `strlist`.
+        
+        `scrubs is a list of (find, replace) pairs of regexes that are used on
+        each string in `strlist`.  A list of scrubbed strings is returned.
+        
+        """
+        scrubbed = []
+        for s in strlist:
+            for rgx_find, rgx_replace in scrubs:
+                s = re.sub(rgx_find, rgx_replace, s)
+            scrubbed.append(s)
+        return scrubbed
 
     def contains(self, filename, *strlist):
         """Check that the file contains all of a list of strings.
@@ -290,7 +313,7 @@ def main():
         for test in test_farm(clean_only=True):
             test[0].run_fully()
     else:
-        print "Need an operation: run, out, clean"
+        print("Need an operation: run, out, clean")
     
 # So that we can run just one farm run.py at a time.
 if __name__ == '__main__':

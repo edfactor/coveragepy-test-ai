@@ -5,7 +5,9 @@ http://nedbatchelder.com/code/coverage
 
 """
 
-__version__ = "3.0.1"    # see detailed history in CHANGES.txt
+__version__ = "3.1b1"    # see detailed history in CHANGES.txt
+
+__url__ = "http://nedbatchelder.com/code/coverage"
 
 from coverage.control import coverage
 from coverage.data import CoverageData

@@ -2,6 +2,9 @@
 
 import glob, os
 
+from coverage.backward import string_class
+
+
 def code_unit_factory(morfs, file_locator, omit_prefixes=None):
     """Construct a list of CodeUnits from polymorphic inputs.
     
@@ -21,7 +24,7 @@ def code_unit_factory(morfs, file_locator, omit_prefixes=None):
     # On Windows, the shell doesn't expand wildcards.  Do it here.
     globbed = []
     for morf in morfs:
-        if isinstance(morf, basestring) and ('?' in morf or '*' in morf):
+        if isinstance(morf, string_class) and ('?' in morf or '*' in morf):
             globbed.extend(glob.glob(morf))
         else:
             globbed.append(morf)
@@ -83,8 +86,26 @@ class CodeUnit:
     def __repr__(self):
         return "<CodeUnit name=%r filename=%r>" % (self.name, self.filename)
 
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
+    # Annoying comparison operators. Py3k wants __lt__ etc, and Py2k needs all
+    # of them defined.
+    
+    def __lt__(self, other):
+        return self.name < other.name
+    
+    def __le__(self, other):
+        return self.name <= other.name
+
+    def __eq__(self, other):
+        return self.name == other.name
+    
+    def __ne__(self, other):
+        return self.name != other.name
+
+    def __gt__(self, other):
+        return self.name > other.name
+    
+    def __ge__(self, other):
+        return self.name >= other.name
 
     def flat_rootname(self):
         """A base for a flat filename to correspond to this code unit.

@@ -1,8 +1,10 @@
 """Tests for coverage.execfile"""
 
-import os
+import os, sys
 
 from coverage.execfile import run_python_file
+
+sys.path.insert(0, os.path.split(__file__)[0]) # Force relative import for Py3k
 from coveragetest import CoverageTest
 
 here = os.path.dirname(__file__)
@@ -40,7 +42,7 @@ class RunTest(CoverageTest):
     def test_no_extra_file(self):
         # Make sure that running a file doesn't create an extra compiled file.
         self.makeFile("xxx", """\
-            print "a non-.py file!"
+            desc = "a non-.py file!"
             """)
 
         self.assertEqual(os.listdir("."), ["xxx"])
@@ -49,10 +51,10 @@ class RunTest(CoverageTest):
 
     def test_universal_newlines(self):
         # Make sure we can read any sort of line ending.
-        pylines = """# try newlines|print 'Hello, world!'|""".split('|')
+        pylines = """# try newlines|print('Hello, world!')|""".split('|')
         for nl in ('\n', '\r\n', '\r'):
             fpy = open('nl.py', 'wb')
-            fpy.write(nl.join(pylines))
+            fpy.write(nl.join(pylines).encode('utf-8'))
             fpy.close()
             run_python_file('nl.py', ['nl.py'])
         self.assertEqual(self.stdout(), "Hello, world!\n"*3)

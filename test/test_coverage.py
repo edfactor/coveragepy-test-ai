@@ -3,11 +3,12 @@
 # http://nedbatchelder.com/code/coverage
 
 import os, sys, unittest
-from cStringIO import StringIO
 
 import coverage
+from coverage.backward import StringIO
 coverage.use_cache(0)
 
+sys.path.insert(0, os.path.split(__file__)[0]) # Force relative import for Py3k
 from coveragetest import CoverageTest
 
 
@@ -206,18 +207,19 @@ class SimpleStatementTest(CoverageTest):
             """,
             [1,2,3,6,9], "")
 
-    def testPrint(self):
-        self.checkCoverage("""\
-            print "hello, world!"
-            print ("hey: %d" %
-                17)
-            print "goodbye"
-            print "hello, world!",
-            print ("hey: %d" %
-                17),
-            print "goodbye",
-            """,
-            [1,2,4,5,6,8], "")
+    if sys.hexversion < 0x03000000:        # Print statement is gone in Py3k.
+        def testPrint(self):
+            self.checkCoverage("""\
+                print "hello, world!"
+                print ("hey: %d" %
+                    17)
+                print "goodbye"
+                print "hello, world!",
+                print ("hey: %d" %
+                    17),
+                print "goodbye",
+                """,
+                [1,2,4,5,6,8], "")
         
     def testRaise(self):
         self.checkCoverage("""\
@@ -281,20 +283,22 @@ class SimpleStatementTest(CoverageTest):
     def testBreak(self):
         self.checkCoverage("""\
             for x in range(10):
-                print "Hello"
+                a = 2 + x
                 break
-                print "Not here"
+                a = 4
+            assert a == 2
             """,
-            [1,2,3,4], "4")
+            [1,2,3,4,5], "4")
         
     def testContinue(self):
         self.checkCoverage("""\
             for x in range(10):
-                print "Hello"
+                a = 2 + x
                 continue
-                print "Not here"
+                a = 4
+            assert a == 11
             """,
-            [1,2,3,4], "4")
+            [1,2,3,4,5], "4")
     
     if 0:
         # Peephole optimization of jumps to jumps can mean that some statements
@@ -394,35 +398,68 @@ class SimpleStatementTest(CoverageTest):
             """,
             [1,2,3,4,5], "")
 
-    def testExec(self):
-        self.checkCoverage("""\
-            a = b = c = 1
-            exec "a = 2"
-            exec ("b = " +
-                "c = " +
-                "2")
-            assert a == 2 and b == 2 and c == 2
-            """,
-            [1,2,3,6], "")
-        self.checkCoverage("""\
-            vars = {'a': 1, 'b': 1, 'c': 1}
-            exec "a = 2" in vars
-            exec ("b = " +
-                "c = " +
-                "2") in vars
-            assert vars['a'] == 2 and vars['b'] == 2 and vars['c'] == 2
-            """,
-            [1,2,3,6], "")
-        self.checkCoverage("""\
-            globs = {}
-            locs = {'a': 1, 'b': 1, 'c': 1}
-            exec "a = 2" in globs, locs
-            exec ("b = " +
-                "c = " +
-                "2") in globs, locs
-            assert locs['a'] == 2 and locs['b'] == 2 and locs['c'] == 2
-            """,
-            [1,2,3,4,7], "")
+    if sys.hexversion < 0x03000000:
+        # In Python 2.x, exec is a statement.
+        def testExec(self):
+            self.checkCoverage("""\
+                a = b = c = 1
+                exec "a = 2"
+                exec ("b = " +
+                    "c = " +
+                    "2")
+                assert a == 2 and b == 2 and c == 2
+                """,
+                [1,2,3,6], "")
+            self.checkCoverage("""\
+                vars = {'a': 1, 'b': 1, 'c': 1}
+                exec "a = 2" in vars
+                exec ("b = " +
+                    "c = " +
+                    "2") in vars
+                assert vars['a'] == 2 and vars['b'] == 2 and vars['c'] == 2
+                """,
+                [1,2,3,6], "")
+            self.checkCoverage("""\
+                globs = {}
+                locs = {'a': 1, 'b': 1, 'c': 1}
+                exec "a = 2" in globs, locs
+                exec ("b = " +
+                    "c = " +
+                    "2") in globs, locs
+                assert locs['a'] == 2 and locs['b'] == 2 and locs['c'] == 2
+                """,
+                [1,2,3,4,7], "")
+    else:
+        # In Python 3.x, exec is a function.
+        def testExec(self):
+            self.checkCoverage("""\
+                a = b = c = 1
+                exec("a = 2")
+                exec("b = " +
+                    "c = " +
+                    "2")
+                assert a == 2 and b == 2 and c == 2
+                """,
+                [1,2,3,6], "")
+            self.checkCoverage("""\
+                vars = {'a': 1, 'b': 1, 'c': 1}
+                exec("a = 2", vars)
+                exec("b = " +
+                    "c = " +
+                    "2", vars)
+                assert vars['a'] == 2 and vars['b'] == 2 and vars['c'] == 2
+                """,
+                [1,2,3,6], "")
+            self.checkCoverage("""\
+                globs = {}
+                locs = {'a': 1, 'b': 1, 'c': 1}
+                exec("a = 2", globs, locs)
+                exec("b = " +
+                    "c = " +
+                    "2", globs, locs)
+                assert locs['a'] == 2 and locs['b'] == 2 and locs['c'] == 2
+                """,
+                [1,2,3,4,7], "")
 
     def testExtraDocString(self):
         self.checkCoverage("""\
@@ -1107,8 +1144,8 @@ class ExcludeTest(CoverageTest):
     def testExcludingAColonNotASuite(self):
         self.checkCoverage("""\
             def foo():
-                l = range(10)
-                print l[:3]   # no cover
+                l = list(range(10))
+                a = l[:3]   # no cover
                 b = 4
                 
             foo()
@@ -1448,22 +1485,22 @@ if sys.hexversion >= 0x020500f0:
                 
                 class Managed:
                     def __enter__(self):
-                        print "enter"
+                        desc = "enter"
                         
                     def __exit__(self, type, value, tb):
-                        print "exit", type
+                        desc = "exit"
                         
                 m = Managed()
                 with m:
-                    print "block1a"
-                    print "block1b"
+                    desc = "block1a"
+                    desc = "block1b"
                     
                 try:
                     with m:
-                        print "block2"
+                        desc = "block2"
                         raise Exception("Boo!")
                 except:
-                    print "caught"
+                    desc = "caught"
                 """,
                 [1,3,4,5,7,8,10,11,12,13,15,16,17,18,19,20], "")
     
@@ -1577,7 +1614,7 @@ class ProcessTest(CoverageTest):
             import covmod1
             import covmodzip1
             a = 1
-            print 'done'
+            print ('done')
             """)
 
         self.assert_(not os.path.exists(".coverage"))
@@ -1590,7 +1627,7 @@ class ProcessTest(CoverageTest):
             import covmod1
             import covmodzip1
             a = 1
-            print 'done'
+            print ('done')
             """)
 
         out = self.run_command("coverage -x mycode.py")
@@ -1649,7 +1686,7 @@ class ProcessTest(CoverageTest):
             else:
                 c = 1
             d = 1
-            print 'done'
+            print ('done')
             """)
         
         out = self.run_command("coverage -x -p b_or_c.py b")
@@ -1689,19 +1726,20 @@ class RecursionTest(CoverageTest):
             """,
             [1,2,3,5,7], "")
         
-    def testLongRecursion(self):
-        # We can't finish a very deep recursion, but we don't crash.
-        self.assertRaises(RuntimeError, self.checkCoverage,
-            """\
-            def recur(n):
-                if n == 0:
-                    return 0
-                else:
-                    return recur(n-1)+1
-                
-            recur(100000)  # This is definitely too many frames.
-            """,
-            [1,2,3,5,7], "")
+    if sys.hexversion < 0x03000000:        # This test currently crashes Py3k.
+        def testLongRecursion(self):
+            # We can't finish a very deep recursion, but we don't crash.
+            self.assertRaises(RuntimeError, self.checkCoverage,
+                """\
+                def recur(n):
+                    if n == 0:
+                        return 0
+                    else:
+                        return recur(n-1)+1
+                    
+                recur(100000)  # This is definitely too many frames.
+                """,
+                [1,2,3,5,7], "")
 
 
 class PyexpatTest(CoverageTest):
@@ -1725,12 +1763,12 @@ class PyexpatTest(CoverageTest):
             def foo():
                 dom = xml.dom.minidom.parseString(XML)
                 assert len(dom.getElementsByTagName('child')) == 2
-                print "Parsed"
+                a = 11
 
             foo()
             """)
 
-        self.makeFile("outer.py", "\n"*100 + "import trydom\nprint 'done'\n")
+        self.makeFile("outer.py", "\n"*100 + "import trydom\na = 102\n")
 
         cov = coverage.coverage()
         cov.erase()
@@ -1805,23 +1843,23 @@ class ExceptionTest(CoverageTest):
         # Each run nests the functions differently to get different combinations
         # of catching exceptions and letting them fly.
         runs = [
-            ("fly oops", {
+            ("doit fly oops", {
                 'doit.py': [302,303,304,305],
                 'fly.py': [102,103],
                 'oops.py': [2,3],
                 }),
-            ("catch oops", {
+            ("doit catch oops", {
                 'doit.py': [302,303],
                 'catch.py': [202,203,204,206,207],
                 'oops.py': [2,3],
                 }),
-            ("fly catch oops", {
+            ("doit fly catch oops", {
                 'doit.py': [302,303],
                 'fly.py': [102,103,104],
                 'catch.py': [202,203,204,206,207],
                 'oops.py': [2,3],
                 }),
-            ("catch fly oops", {
+            ("doit catch fly oops", {
                 'doit.py': [302,303],
                 'catch.py': [202,203,204,206,207],
                 'fly.py': [102,103],
@@ -1830,12 +1868,15 @@ class ExceptionTest(CoverageTest):
             ]
         
         for callnames, lines_expected in runs:
-            cov = coverage.coverage()
     
-            # Import the python file, executing it.
-            cov.start()
+            # Make the list of functions we'll call for this test.
             calls = [getattr(sys.modules[cn], cn) for cn in callnames.split()]
-            getattr(sys.modules['doit'], 'doit')(calls)
+            
+            cov = coverage.coverage()
+            cov.start()
+            # Call our list of functions: invoke the first, with the rest as
+            # an argument.
+            calls[0](calls[1:])
             cov.stop()
     
             # Clean the line data and compare to expected results.
@@ -1851,7 +1892,7 @@ class ExceptionTest(CoverageTest):
 
 
 if __name__ == '__main__':
-    print "Testing under Python version: %s" % sys.version
+    print("Testing under Python version: %s" % sys.version)
     unittest.main()
 
 

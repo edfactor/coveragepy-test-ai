@@ -2,6 +2,17 @@
 
 import imp, os, sys
 
+from coverage.backward import exec_function
+
+
+try:
+    # In Py 2.x, the builtins were in __builtin__
+    BUILTINS = sys.modules['__builtin__']
+except KeyError:
+    # In Py 3.x, they're in builtins
+    BUILTINS = sys.modules['builtins']
+
+
 def run_python_file(filename, args):
     """Run a python file as if it were the main program on the command line.
     
@@ -15,7 +26,7 @@ def run_python_file(filename, args):
     main_mod = imp.new_module('__main__')
     sys.modules['__main__'] = main_mod
     main_mod.__file__ = filename
-    main_mod.__builtins__ = sys.modules['__builtin__']
+    main_mod.__builtins__ = BUILTINS
 
     # Set sys.argv and the first path element properly.
     old_argv = sys.argv
@@ -25,7 +36,7 @@ def run_python_file(filename, args):
 
     try:
         source = open(filename, 'rU').read()
-        exec compile(source, filename, "exec") in main_mod.__dict__
+        exec_function(source, filename, main_mod.__dict__)
     finally:
         # Restore the old __main__
         sys.modules['__main__'] = old_main_mod

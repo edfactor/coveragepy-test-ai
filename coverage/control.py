@@ -3,6 +3,7 @@
 import os, socket
 
 from coverage.annotate import AnnotateReporter
+from coverage.backward import string_class
 from coverage.codeunit import code_unit_factory
 from coverage.collector import Collector
 from coverage.data import CoverageData
@@ -10,6 +11,7 @@ from coverage.files import FileLocator
 from coverage.html import HtmlReporter
 from coverage.misc import format_lines, CoverageException
 from coverage.summary import SummaryReporter
+from coverage.xmlreport import XmlReporter
 
 class coverage:
     """Programmatic access to Coverage.
@@ -20,13 +22,14 @@ class coverage:
         
         cov = coverage()
         cov.start()
-        #.. blah blah (run your code) blah blah
+        #.. blah blah (run your code) blah blah ..
         cov.stop()
         cov.html_report(directory='covhtml')
 
     """
+
     def __init__(self, data_file=None, data_suffix=False, cover_pylib=False,
-                auto_data=False):
+                auto_data=False, timid=False):
         """Create a new coverage measurement context.
         
         `data_file` is the base name of the data file to use, defaulting to
@@ -42,6 +45,11 @@ class coverage:
         coverage measurement starts, and data will be saved automatically when
         measurement stops.
         
+        If `timid` is true, then a slower simpler trace function will be
+        used.  This is important for some environments where manipulation of
+        tracing functions make the faster more sophisticated trace function not
+        operate properly.
+        
         """
         from coverage import __version__
         
@@ -53,11 +61,15 @@ class coverage:
         
         self.file_locator = FileLocator()
         
-        self.collector = Collector(self._should_trace)
+        # Timidity: for nose users, read an environment variable.  This is a
+        # cheap hack, since the rest of the command line arguments aren't
+        # recognized, but it solves some users' problems.
+        timid = timid or ('--timid' in os.environ.get('COVERAGE_OPTIONS', ''))
+        self.collector = Collector(self._should_trace, timid=timid)
 
         # Create the data file.
         if data_suffix:
-            if not isinstance(data_suffix, basestring):
+            if not isinstance(data_suffix, string_class):
                 # if data_suffix=True, use .machinename.pid
                 data_suffix = ".%s.%s" % (socket.gethostname(), os.getpid())
         else:
@@ -118,6 +130,15 @@ class coverage:
             return False
 
         return canonical
+
+    # To log what should_trace returns, change this to "if 1:"
+    if 0:
+        _real_should_trace = _should_trace
+        def _should_trace(self, filename, frame):   # pylint: disable-msg=E0102
+            """A logging decorator around the real _should_trace function."""
+            ret = self._real_should_trace(filename, frame)
+            print("should_trace: %r -> %r" % (filename, ret))
+            return ret
 
     def use_cache(self, usecache):
         """Control the use of a data file (incorrectly called a cache).
@@ -299,3 +320,39 @@ class coverage:
         reporter = HtmlReporter(self, ignore_errors)
         reporter.report(
             morfs, directory=directory, omit_prefixes=omit_prefixes)
+
+    def xml_report(self, morfs=None, outfile=None, ignore_errors=False,
+                    omit_prefixes=None):
+        """Generate an XML report of coverage results.
+        
+        The report is compatible with Cobertura reports.
+        
+        """
+        if outfile:
+            outfile = open(outfile, "w")
+        reporter = XmlReporter(self, ignore_errors)
+        reporter.report(morfs, omit_prefixes=omit_prefixes, outfile=outfile)
+
+    def sysinfo(self):
+        """Return a list of key,value pairs showing internal information."""
+        
+        import coverage as covmod
+        import platform, re, sys
+
+        info = [
+            ('version', covmod.__version__),
+            ('coverage', covmod.__file__),
+            ('cover_prefix', self.cover_prefix),
+            ('pylib_prefix', self.pylib_prefix),
+            ('tracer', self.collector.tracer_name()),
+            ('data_file', self.data.filename),
+            ('python', sys.version.replace('\n', '')),
+            ('platform', platform.platform()),
+            ('cwd', os.getcwd()),
+            ('path', sys.path),
+            ('environment', [
+                ("%s = %s" % (k, v)) for k, v in os.environ.items()
+                    if re.search("^COV|^PY", k)
+                ]),
+            ]
+        return info

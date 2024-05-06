@@ -1,10 +1,10 @@
 """Base test case class for coverage testing."""
 
 import imp, os, random, shutil, sys, tempfile, textwrap, unittest
-from cStringIO import StringIO
 
 import coverage
-from coverage.backward import set   # pylint: disable-msg=W0622
+from coverage.backward import set, StringIO   # pylint: disable-msg=W0622
+from backtest import run_command
 
 
 class Tee(object):
@@ -32,6 +32,9 @@ class CoverageTest(unittest.TestCase):
         self.old_dir = os.getcwd()
         os.chdir(self.temp_dir)
 
+        # Preserve changes to PYTHONPATH.
+        self.old_pypath = os.environ.get('PYTHONPATH', '')
+
         # Modules should be importable from this temp directory.
         self.old_syspath = sys.path[:]
         sys.path.insert(0, '')
@@ -45,9 +48,10 @@ class CoverageTest(unittest.TestCase):
         sys.stdout = Tee(sys.stdout, self.captured_stdout)
         
     def tearDown(self):
-        # Restore the original sys.path
+        # Restore the original sys.path and PYTHONPATH
         sys.path = self.old_syspath
-        
+        os.environ['PYTHONPATH'] = self.old_pypath
+
         # Get rid of the temporary directory.
         os.chdir(self.old_dir)
         shutil.rmtree(self.temp_root)
@@ -164,7 +168,8 @@ class CoverageTest(unittest.TestCase):
         """
         try:
             callableObj(*args, **kwargs)
-        except excClass, exc:
+        except excClass:
+            _, exc, _ = sys.exc_info()
             excMsg = str(exc)
             if not msg:
                 # No message provided: it passes.
@@ -203,15 +208,14 @@ class CoverageTest(unittest.TestCase):
         here = os.path.dirname(self.nice_file(coverage.__file__, ".."))
         testmods = self.nice_file(here, 'test/modules')
         zipfile = self.nice_file(here, 'test/zipmods.zip')
-        pypath = os.environ.get('PYTHONPATH', '')
+        pypath = self.old_pypath
         if pypath:
             pypath += os.pathsep
         pypath += testmods + os.pathsep + zipfile
         os.environ['PYTHONPATH'] = pypath
         
-        stdin_unused, stdouterr = os.popen4(cmd)
-        output = stdouterr.read()
-        print output
+        _, output = run_command(cmd)
+        print(output)
         return output
 
     def assert_equal_sets(self, s1, s2):

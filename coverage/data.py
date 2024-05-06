@@ -1,9 +1,8 @@
 """Coverage data for Coverage."""
 
 import os
-import cPickle as pickle
 
-from coverage.backward import sorted    # pylint: disable-msg=W0622
+from coverage.backward import pickle, sorted    # pylint: disable-msg=W0622
 
 
 class CoverageData:
@@ -37,12 +36,17 @@ class CoverageData:
         `collector` is a string describing the coverage measurement software.
 
         """
-        self.basename = basename
         self.collector = collector
-        self.suffix = suffix
         
         self.use_file = True
-        self.filename = None
+
+        # Construct the filename that will be used for data file storage, if we
+        # ever do any file storage.
+        self.filename = (basename or
+                os.environ.get(self.filename_env, self.filename_default))
+        if suffix:
+            self.filename += suffix
+        self.filename = os.path.abspath(self.filename)
 
         # A map from canonical Python source file name to a dictionary in
         # which there's an entry for each line number that has been
@@ -59,34 +63,21 @@ class CoverageData:
         """Set whether or not to use a disk file for data."""
         self.use_file = use_file
 
-    def _make_filename(self):
-        """Construct the filename that will be used for data file storage."""
-        assert self.use_file
-        if not self.filename:
-            self.filename = (self.basename or
-                    os.environ.get(self.filename_env, self.filename_default))
-
-            if self.suffix:
-                self.filename += self.suffix
-
     def read(self):
         """Read coverage data from the coverage data file (if it exists)."""
         data = {}
         if self.use_file:
-            self._make_filename()
             data = self._read_file(self.filename)
         self.lines = data
 
     def write(self):
         """Write the collected coverage data to a file."""
         if self.use_file:
-            self._make_filename()
             self.write_file(self.filename)
 
     def erase(self):
         """Erase the data, both in this object, and from its file storage."""
         if self.use_file:
-            self._make_filename()
             if self.filename and os.path.exists(self.filename):
                 os.remove(self.filename)
         self.lines = {}
@@ -111,7 +102,7 @@ class CoverageData:
         # Write the pickle to the file.
         fdata = open(filename, 'wb')
         try:
-            pickle.dump(data, fdata)
+            pickle.dump(data, fdata, 2)
         finally:
             fdata.close()
 
@@ -143,7 +134,6 @@ class CoverageData:
         """ Treat self.filename as a file prefix, and combine the data from all
             of the files starting with that prefix.
         """
-        self._make_filename()
         data_dir, local = os.path.split(self.filename)
         for f in os.listdir(data_dir or '.'):
             if f.startswith(local):
@@ -163,7 +153,7 @@ class CoverageData:
 
     def executed_files(self):
         """A list of all files that had been measured as executed."""
-        return self.lines.keys()
+        return list(self.lines.keys())
 
     def executed_lines(self, filename):
         """A map containing all the line numbers executed in `filename`.
@@ -174,14 +164,19 @@ class CoverageData:
         """
         return self.lines.get(filename) or {}
 
-    def summary(self):
+    def summary(self, fullpath=False):
         """Return a dict summarizing the coverage data.
         
-        Keys are the basename of the filenames, and values are the number of
-        executed lines.  This is useful in the unit tests.
+        Keys are based on the filenames, and values are the number of executed
+        lines.  If `fullpath` is true, then the keys are the full pathnames of
+        the files, otherwise they are the basenames of the files.
         
         """
         summ = {}
+        if fullpath:
+            filename_fn = lambda f: f
+        else:
+            filename_fn = os.path.basename
         for filename, lines in self.lines.items():
-            summ[os.path.basename(filename)] = len(lines)
+            summ[filename_fn(filename)] = len(lines)
         return summ

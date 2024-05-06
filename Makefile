@@ -7,22 +7,22 @@ TEST_ZIP = test/zipmods.zip
 
 clean:
 	python test/test_farm.py clean
-	-rm -rf build
-	-rm -rf coverage.egg-info
-	-rm -rf dist
-	-rm -rf htmlcov
+	-rm -rf build coverage.egg-info dist htmlcov
 	-rm -f *.pyd */*.pyd 
 	-rm -f *.pyc */*.pyc */*/*.pyc */*/*/*.pyc */*/*/*/*.pyc */*/*/*/*/*.pyc
 	-rm -f *.pyo */*.pyo */*/*.pyo */*/*/*.pyo */*/*/*/*.pyo */*/*/*/*/*.pyo
 	-rm -f *.bak */*.bak */*/*.bak */*/*/*.bak */*/*/*/*.bak */*/*/*/*/*.bak
 	-rm -f coverage/*,cover
 	-rm -f MANIFEST
-	-rm -f .coverage .coverage.*
+	-rm -f .coverage .coverage.* coverage.xml
 	-rm -f $(TEST_ZIP)
 	-rm -f setuptools-*.egg
 	-rm -rf doc/_build/*
 
-LINTABLE_TESTS = \
+LINTABLE = \
+	coverage \
+	scripts/coverage \
+	setup.py \
 	test/coverage_coverage.py \
 	test/coveragetest.py \
 	test/test_api.py \
@@ -34,15 +34,16 @@ LINTABLE_TESTS = \
 	test/test_templite.py
 
 lint: 
-	-python -x /Python25/Scripts/pylint.bat --rcfile=.pylintrc coverage $(LINTABLE_TESTS)
-	python /Python25/Lib/tabnanny.py coverage test
+	-python -x /Python25/Scripts/pylint.bat --rcfile=.pylintrc $(LINTABLE)
+	python /Python25/Lib/tabnanny.py coverage scripts test setup.py
 	python checkeol.py
 
-testready: $(TEST_ZIP) devinst
+testready: testdata devinst
 
 tests: testready
 	nosetests
 
+testdata: $(TEST_ZIP)
 $(TEST_ZIP): test/covmodzip1.py
 	zip -j $@ $+
 
