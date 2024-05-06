@@ -2,7 +2,10 @@ Coverage TODO
 
 * 3.1
 
-- Python 3.1 support.
++ Python 3.1 support.
+
+* 3.2
+
 - bitvector in trace extension.
 
 
@@ -180,6 +183,8 @@ x Tests about the "import __main__" in cmdline.py
     - 3.1a1, 3.1b1, 3.1c1, 3.1
 - Update CHANGES, including release date.
 - Update docs
+    - Version, date, and changes in doc/changes.rst
+    - Version and date in doc/index.rst
     - Generate new sample_html to get the latest, incl footer version number:
         cd C:\ned\cog\trunk
         rmdir/s/q htmlcov
@@ -201,3 +206,4 @@ x Tests about the "import __main__" in cmdline.py
     - Blog post?
 - Update bitbucket:
     - Issue tracker should get new version number in picker.
+- Announce on TIP.

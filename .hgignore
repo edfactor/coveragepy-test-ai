@@ -11,12 +11,11 @@ syntax: glob
 
 # Stuff in the root.
 build
-coverage.egg-info
+*.egg-info
 dist
 htmlcov
 MANIFEST
 setuptools-*.egg
-three
 
 # Stuff in the test directory.
 zipmods.zip
