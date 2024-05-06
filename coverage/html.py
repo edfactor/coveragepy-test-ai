@@ -1,11 +1,11 @@
 """HTML reporting for Coverage."""
 
-import os, re, shutil
+import os, re, shutil, sys
 
 import coverage
-from coverage.backward import pickle, write_encoded
+from coverage.backward import pickle
 from coverage.misc import CoverageException, Hasher
-from coverage.phystokens import source_token_lines
+from coverage.phystokens import source_token_lines, source_encoding
 from coverage.report import Reporter
 from coverage.templite import Templite
 
@@ -41,8 +41,8 @@ class HtmlReporter(Reporter):
             "keybd_open.png",
             ]
 
-    def __init__(self, cov, ignore_errors=False):
-        super(HtmlReporter, self).__init__(cov, ignore_errors)
+    def __init__(self, cov, config):
+        super(HtmlReporter, self).__init__(cov, config)
         self.directory = None
         self.template_globals = {
             'escape': escape,
@@ -58,29 +58,33 @@ class HtmlReporter(Reporter):
         self.files = []
         self.arcs = self.coverage.data.has_arcs()
         self.status = HtmlStatus()
+        self.extra_css = None
 
-    def report(self, morfs, config=None):
+    def report(self, morfs):
         """Generate an HTML report for `morfs`.
 
-        `morfs` is a list of modules or filenames.  `config` is a
-        CoverageConfig instance.
+        `morfs` is a list of modules or filenames.
 
         """
-        assert config.html_dir, "must provide a directory for html reporting"
+        assert self.config.html_dir, "must give a directory for html reporting"
 
         # Read the status data.
-        self.status.read(config.html_dir)
+        self.status.read(self.config.html_dir)
 
         # Check that this run used the same settings as the last run.
         m = Hasher()
-        m.update(config)
+        m.update(self.config)
         these_settings = m.digest()
         if self.status.settings_hash() != these_settings:
             self.status.reset()
             self.status.set_settings_hash(these_settings)
 
+        # The user may have extra CSS they want copied.
+        if self.config.extra_css:
+            self.extra_css = os.path.basename(self.config.extra_css)
+
         # Process all the files.
-        self.report_files(self.html_file, morfs, config, config.html_dir)
+        self.report_files(self.html_file, morfs, self.config.html_dir)
 
         if not self.files:
             raise CoverageException("No data to report.")
@@ -92,15 +96,27 @@ class HtmlReporter(Reporter):
 
     def make_local_static_report_files(self):
         """Make local instances of static files for HTML report."""
+        # The files we provide must always be copied.
         for static in self.STATIC_FILES:
             shutil.copyfile(
                 data_filename("htmlfiles/" + static),
                 os.path.join(self.directory, static)
                 )
 
+        # The user may have extra CSS they want copied.
+        if self.extra_css:
+            shutil.copyfile(
+                self.config.extra_css,
+                os.path.join(self.directory, self.extra_css)
+                )
+
     def write_html(self, fname, html):
         """Write `html` to `fname`, properly encoded."""
-        write_encoded(fname, html, 'ascii', 'xmlcharrefreplace')
+        fout = open(fname, "wb")
+        try:
+            fout.write(html.encode('ascii', 'xmlcharrefreplace'))
+        finally:
+            fout.close()
 
     def file_hash(self, source, cu):
         """Compute a hash that changes if the file needs to be re-reported."""
@@ -128,6 +144,12 @@ class HtmlReporter(Reporter):
 
         self.status.set_file_hash(flat_rootname, this_hash)
 
+        # If need be, determine the encoding of the source file. We use it
+        # later to properly write the HTML.
+        if sys.version_info < (3, 0):
+            encoding = source_encoding(source)
+
+        # Get the numbers for this file.
         nums = analysis.numbers
 
         missing_branch_arcs = analysis.missing_branch_arcs()
@@ -193,8 +215,11 @@ class HtmlReporter(Reporter):
         # Write the HTML page for this file.
         html_filename = flat_rootname + ".html"
         html_path = os.path.join(self.directory, html_filename)
+        extra_css = self.extra_css
 
         html = spaceless(self.source_tmpl.render(locals()))
+        if sys.version_info < (3, 0):
+            html = html.decode(encoding)
         self.write_html(html_path, html)
 
         # Save this file's information for the index file.
@@ -217,6 +242,7 @@ class HtmlReporter(Reporter):
         arcs = self.arcs
 
         totals = sum([f['nums'] for f in files])
+        extra_css = self.extra_css
 
         self.write_html(
             os.path.join(self.directory, "index.html"),
@@ -246,7 +272,11 @@ class HtmlStatus(object):
         usable = False
         try:
             status_file = os.path.join(directory, self.STATUS_FILE)
-            status = pickle.load(open(status_file, "rb"))
+            fstatus = open(status_file, "rb")
+            try:
+                status = pickle.load(fstatus)
+            finally:
+                fstatus.close()
         except IOError:
             usable = False
         else:

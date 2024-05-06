@@ -161,20 +161,30 @@ supply the "pragma: no branch" regex if you still want to use it.
 display for reported coverage percentages.  The default is 0, displaying
 for example "87%".  A value of 2 will display percentages like "87.32%".
 
+``show_missing`` (boolean, default False): when running a summary report,
+show missing lines.  See :ref:`cmd_summary` for more information.
+
+
+.. _config_html:
 
 [html]
 ------
 
 Values particular to HTML reporting.  The values in the ``[report]`` section
-also apply to HTML output.
+also apply to HTML output, where appropriate.
 
 ``directory`` (string, default "htmlcov"): where to write the HTML report files.
+
+``extra_css`` (string): the path to a file of CSS to apply to the HTML report.
+The file will be copied into the HTML output directory.  Don't name it
+"style.css".  This CSS is in addition to the CSS normally used, though you can
+overwrite as many of the rules as you like.
 
 
 [xml]
 -----
 
 Values particular to XML reporting.  The values in the ``[report]`` section
-also apply to XML output.
+also apply to XML output, where appropriate.
 
 ``output`` (string, default "coverage.xml"): where to write the XML report.

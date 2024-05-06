@@ -222,14 +222,6 @@ class coverage(object):
             # can't do anything with the data later anyway.
             return False
 
-        if filename.endswith(".html"):
-            # Jinja and maybe other templating systems compile templates into
-            # Python code, but use the template filename as the filename in
-            # the compiled code.  Of course, those filenames are useless later
-            # so don't bother collecting.  TODO: How should we really separate
-            # out good file extensions from bad?
-            return False
-
         self._check_for_packages()
 
         # Compiled Python files have two filenames: frame.f_code.co_filename is
@@ -327,7 +319,7 @@ class coverage(object):
                 try:
                     pkg_file = mod.__file__
                 except AttributeError:
-                    self._warn("Module %s has no Python source." % pkg)
+                    pkg_file = None
                 else:
                     d, f = os.path.split(pkg_file)
                     if f.startswith('__init__.'):
@@ -336,8 +328,14 @@ class coverage(object):
                     else:
                         pkg_file = self._source_for_file(pkg_file)
                     pkg_file = self.file_locator.canonical_filename(pkg_file)
+                    if not os.path.exists(pkg_file):
+                        pkg_file = None
+
+                if pkg_file:
                     self.source.append(pkg_file)
                     self.source_match.add(pkg_file)
+                else:
+                    self._warn("Module %s has no Python source." % pkg)
 
             for pkg in found:
                 self.source_pkgs.remove(pkg)
@@ -559,12 +557,11 @@ class coverage(object):
 
         """
         self.config.from_args(
-            ignore_errors=ignore_errors, omit=omit, include=include
+            ignore_errors=ignore_errors, omit=omit, include=include,
+            show_missing=show_missing,
             )
-        reporter = SummaryReporter(
-            self, show_missing, self.config.ignore_errors
-            )
-        reporter.report(morfs, outfile=file, config=self.config)
+        reporter = SummaryReporter(self, self.config)
+        reporter.report(morfs, outfile=file)
 
     def annotate(self, morfs=None, directory=None, ignore_errors=None,
                     omit=None, include=None):
@@ -581,22 +578,29 @@ class coverage(object):
         self.config.from_args(
             ignore_errors=ignore_errors, omit=omit, include=include
             )
-        reporter = AnnotateReporter(self, self.config.ignore_errors)
-        reporter.report(morfs, config=self.config, directory=directory)
+        reporter = AnnotateReporter(self, self.config)
+        reporter.report(morfs, directory=directory)
 
     def html_report(self, morfs=None, directory=None, ignore_errors=None,
-                    omit=None, include=None):
+                    omit=None, include=None, extra_css=None):
         """Generate an HTML report.
+
+        The HTML is written to `directory`.  The file "index.html" is the
+        overview starting point, with links to more detailed pages for
+        individual modules.
+
+        `extra_css` is a path to a file of other CSS to apply on the page.
+        It will be copied into the HTML directory.
 
         See `coverage.report()` for other arguments.
 
         """
         self.config.from_args(
             ignore_errors=ignore_errors, omit=omit, include=include,
-            html_dir=directory,
+            html_dir=directory, extra_css=extra_css,
             )
-        reporter = HtmlReporter(self, self.config.ignore_errors)
-        reporter.report(morfs, config=self.config)
+        reporter = HtmlReporter(self, self.config)
+        reporter.report(morfs)
 
     def xml_report(self, morfs=None, outfile=None, ignore_errors=None,
                     omit=None, include=None):
@@ -622,8 +626,8 @@ class coverage(object):
                 outfile = open(self.config.xml_output, "w")
                 file_to_close = outfile
         try:
-            reporter = XmlReporter(self, self.config.ignore_errors)
-            reporter.report(morfs, outfile=outfile, config=self.config)
+            reporter = XmlReporter(self, self.config)
+            reporter.report(morfs, outfile=outfile)
         finally:
             if file_to_close:
                 file_to_close.close()

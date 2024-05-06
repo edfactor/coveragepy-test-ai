@@ -6,7 +6,7 @@ Coverage.py measures code coverage, typically during test execution. It uses
 the code analysis tools and tracing hooks provided in the Python standard
 library to determine which lines are executable, and which have been executed.
 
-Coverage.py runs on Pythons 2.3 through 3.2.
+Coverage.py runs on Pythons 2.3 through 3.3, and PyPy 1.8.
 
 Documentation is at `nedbatchelder.com <%s>`_.  Code repository and issue
 tracker are at `bitbucket.org <http://bitbucket.org/ned/coveragepy>`_.
@@ -102,8 +102,19 @@ setup_args = dict(
     url = __url__,
     )
 
-# Jython can't compile C extensions
-if not sys.platform.startswith('java'):
+# There are a few reasons we might not be able to compile the C extension.
+
+compile_extension = True
+
+if sys.platform.startswith('java'):
+    # Jython can't compile C extensions
+    compile_extension = False
+
+if '__pypy__' in sys.builtin_module_names:
+    # Pypy can't compile C extensions
+    compile_extension = False
+
+if compile_extension:
     setup_args.update(dict(
         ext_modules = [
             Extension("coverage.tracer", sources=["coverage/tracer.c"])

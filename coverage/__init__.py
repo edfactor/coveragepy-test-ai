@@ -5,7 +5,7 @@ http://nedbatchelder.com/code/coverage
 
 """
 
-__version__ = "3.5.1"     # see detailed history in CHANGES.txt
+__version__ = "3.5.2"       # see detailed history in CHANGES.txt
 
 __url__ = "http://nedbatchelder.com/code/coverage"
 if max(__version__).isalpha():
@@ -60,7 +60,7 @@ annotate =  _singleton_method('annotate')
 # COPYRIGHT AND LICENSE
 #
 # Copyright 2001 Gareth Rees.  All rights reserved.
-# Copyright 2004-2010 Ned Batchelder.  All rights reserved.
+# Copyright 2004-2011 Ned Batchelder.  All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
